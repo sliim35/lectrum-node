@@ -5,8 +5,31 @@ class Ui extends Readable {
     super(options);
     this._data = data;
     this.on('data', chunk => {});
+    this.on('error', err => console.error(err));
   }
+  _validateData(data) {
+    data.forEach(el => {
+      if (
+        el.name === '' ||
+        !el.name ||
+        el.email === '' ||
+        !el.email ||
+        (el.password === '' && !el.password)
+      ) {
+        this.emit('error', new Error('All fields must be filled'));
+      }
+      if (
+        typeof el.name !== 'string' ||
+        typeof el.email !== 'string' ||
+        typeof el.password !== 'string'
+      ) {
+        this.emit('error', new Error('All fields must be a String'));
+      }
+    });
+  }
+
   _read() {
+    this._validateData(this._data);
     let data = this._data.shift();
     if (!data) {
       this.push(null);
@@ -29,9 +52,14 @@ class Guardian extends Transform {
     const hexEmail = this._protect(chunk.email);
     const hexPassword = this._protect(chunk.password);
     this.push({
-      ...chunk,
-      email: hexEmail,
-      password: hexPassword
+      meta: {
+        source: 'ui'
+      },
+      payload: {
+        ...chunk,
+        email: hexEmail,
+        password: hexPassword
+      }
     });
     done();
   }
@@ -74,4 +102,3 @@ const guardian = new Guardian(options);
 const manager = new AccountManager(options);
 
 ui.pipe(guardian).pipe(manager);
-manager.show();
